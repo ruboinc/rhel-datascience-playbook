@@ -1,0 +1,48 @@
+---
+- hosts: rh-gpgpu
+  remote_user: ec2-user
+  tasks:
+
+  - name: install basic tools
+    become: yes
+    yum: name={{ item }} state=latest
+    with_items:
+    - wget
+    - gcc
+
+  - name: install the right kernel-devel package
+    become: yes
+    shell: yum install -y kernel-devel-`uname -r`
+
+  - name: download the GPU driver from nvidia
+    get_url: url=http://us.download.nvidia.com/XFree86/Linux-x86_64/361.42/NVIDIA-Linux-x86_64-361.42.run dest=~/NVIDIA-Linux-x86_64-361.42.run mode=0500
+
+  - name: disable nouveau driver
+    become: yes
+    kernel_blacklist: name=nouveau state=present
+
+  - name: restart machine
+    become: yes
+    shell: sleep 2 && shutdown -r now "Ansible updates triggered"
+    async: 1
+    poll: 0
+    ignore_errors: true
+
+  - name: waiting for server to come back
+    local_action: wait_for host={{ inventory_hostname }} state=started delay=30 timeout=300
+
+  - name: install the nvidia driver
+    become: yes
+    shell: ./NVIDIA-Linux-x86_64-361.42.run -a -n -X -s
+
+  - name: restart machine
+    become: yes
+    shell: sleep 2 && shutdown -r now "Ansible updates triggered"
+    async: 1
+    poll: 0
+    ignore_errors: true
+
+  - name: waiting for server to come back
+    local_action: wait_for host={{ inventory_hostname }} state=started delay=30 timeout=300
+
+    
